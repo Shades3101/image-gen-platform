@@ -6,6 +6,7 @@ import { S3Client } from "bun";
 import { FalAIModel } from "./models/FalAIModel";
 import cors from "cors";
 import { authMiddleware } from "./middleware";
+import { fal } from "@fal-ai/client";
 
 const USER_ID = "123"
 
@@ -200,13 +201,17 @@ app.post("/fal-ai/webhook/train", async (req, res) => {
     console.log("/fal-ai/webhook/train")
     console.log(req.body)
     //update the status of the image in db
-    const request_id = req.body.request_id;
+    const requestId = req.body.request_id as string;
+
+    const result = await fal.queue.result("fal-ai/flux-lora", {
+        requestId
+    })
 
     const { imageUrl } = await falAiModel.generateImageSync(req.body.tensor_Path)
 
     await prismaClient.model.updateMany({
         where: {
-            falAiRequest: request_id
+            falAiRequest: requestId
         },
         data: {
             trainingStatus: "Generated",
@@ -225,7 +230,7 @@ app.post("/fal-ai/webhook/image", async (req, res) => {
     console.log("/fal-ai/webhook/image")
     console.log(req.body)
     //update the status of the image in db
-    const request_id = req.body.request_id;
+    const request_id = req.body.request_id as string;
 
     if (req.body.status === "ERROR") {
         res.status(411).json({});
@@ -246,7 +251,7 @@ app.post("/fal-ai/webhook/image", async (req, res) => {
             falAiRequest: request_id
         },
         data: {
-            status: "Generated",
+            status: "Generated", 
             imageUrl: req.body.payload.images[0].url
         }
     })
