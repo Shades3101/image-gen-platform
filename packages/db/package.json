@@ -2,6 +2,10 @@
   "name": "db",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "build": "prisma generate",
+    "postinstall": "prisma generate"
+  },
   "exports": {
     ".": "./*.ts"
   },
