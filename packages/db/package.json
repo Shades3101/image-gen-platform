@@ -11,8 +11,7 @@
   },
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest",
-    "prisma": "^7.1.0"
+    "@types/bun": "latest"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -20,6 +19,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.1.0",
     "@prisma/client": "^7.1.0",
-    "dotenv": "^17.2.3"
+    "dotenv": "^17.2.3",
+    "prisma": "^7.1.0"
   }
 }
