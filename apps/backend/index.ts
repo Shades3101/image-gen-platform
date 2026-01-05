@@ -1,7 +1,7 @@
 import express from "express";
 import { TrainModel, GenerateImage, GenerateImageFromPack } from "../../packages/common/types";
 import { prismaClient } from "../../packages/db";
-import type { PackPrompts, OutputImages } from "../../packages/db";
+
 import { S3Client } from "bun";
 import { FalAIModel } from "./models/FalAIModel";
 import cors from "cors";
@@ -125,10 +125,10 @@ app.post("/pack/generate", authMiddleware, async (req, res) => {
         }
     })
 
-    let requestIds: { request_id: string }[] = await Promise.all(prompts.map((prompt) => falAiModel.generateImage(prompt.prompt, parsedBody.data.modelId)))
+    let requestIds: { request_id: string }[] = await Promise.all(prompts.map((prompt: { prompt: string }) => falAiModel.generateImage(prompt.prompt, parsedBody.data.modelId)))
 
     const images = await prismaClient.outputImages.createManyAndReturn({
-        data: prompts.map((prompt: PackPrompts, index) => ({
+        data: prompts.map((prompt: { prompt: string }, index: number) => ({
             prompt: prompt.prompt,
             userId: req.userId!,
             modelId: parsedBody.data.modelId,
@@ -138,7 +138,7 @@ app.post("/pack/generate", authMiddleware, async (req, res) => {
     })
 
     res.json({
-        images: images.map((image: OutputImages) => image.id)
+        images: images.map((image: { id: string }) => image.id)
     })
 });
 
@@ -172,7 +172,7 @@ app.get("/image/bulk", authMiddleware, async (req, res) => {
 app.get("/models", authMiddleware, async (req, res) => {
     const models = await prismaClient.model.findMany({
         where: {
-           OR: [{ userId: req.userId}, {open: true}]
+            OR: [{ userId: req.userId }, { open: true }]
         }
     })
 
