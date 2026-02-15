@@ -15,7 +15,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "AI Photo Generator by Pic-X",
+  title: "AI Photo Generator by PixGen",
   description: "AI Photo Generator",
 };
 

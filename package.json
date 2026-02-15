@@ -1,5 +1,5 @@
 {
-  "name": "pic-x",
+  "name": "pixgen",
   "devDependencies": {
     "prettier": "^3.8.1",
     "turbo": "^2.8.9",
