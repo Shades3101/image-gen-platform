@@ -17,9 +17,8 @@ app.use(cors({
     credentials: true
 }));
 
-console.log(process.env.FRONTEND_URL);
-
-
+console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
+console.log("All env keys:", Object.keys(process.env).filter(k => !k.startsWith("npm_")).join(", "));
 app.use(express.json())
 
 app.get("/pre-signed-url", async (req, res) => {
