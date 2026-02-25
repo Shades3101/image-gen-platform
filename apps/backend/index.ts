@@ -11,10 +11,12 @@ const PORT = Number(process.env.PORT ?? 8080);
 const modalModel = new ModalModel();
 
 const app = express();
+
 app.use(cors({
     origin: process.env.FRONTEND_URL,
     credentials: true
-}))
+}));
+
 app.use(express.json())
 
 app.get("/pre-signed-url", async (req, res) => {
@@ -295,4 +297,5 @@ app.post("/modal/webhook/image", async (req, res) => {
 
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server is running on ${PORT}`);
+    console.log(process.env.FRONTEND_URL)
 })
