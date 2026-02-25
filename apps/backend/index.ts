@@ -17,8 +17,6 @@ app.use(cors({
     credentials: true
 }));
 
-console.log("FRONTEND_URL:", process.env.FRONTEND_URL);
-console.log("All env keys:", Object.keys(process.env).filter(k => !k.startsWith("npm_")).join(", "));
 app.use(express.json())
 
 app.get("/pre-signed-url", async (req, res) => {
@@ -44,34 +42,44 @@ app.get("/pre-signed-url", async (req, res) => {
 })
 
 app.post("/ai/training", authMiddleware, async (req, res) => {
-    const parsedBody = TrainModel.safeParse(req.body);
+    try {
+        const parsedBody = TrainModel.safeParse(req.body);
 
-    if (!parsedBody.success) {
-        return res.status(411).json({
-            message: "Input incorrect"
+        if (!parsedBody.success) {
+            return res.status(411).json({
+                message: "Input incorrect"
+            })
+        }
+
+        // Create DB record first so we have the modelId to send to Modal
+        const data = await prismaClient.model.create({
+            data: {
+                name: parsedBody.data.name,
+                type: parsedBody.data.type,
+                age: parsedBody.data.age,
+                ethnicity: parsedBody.data.ethnicity as EthnicityEnum,
+                eyeColor: parsedBody.data.eyeColor,
+                bald: parsedBody.data.bald,
+                userId: req.userId!,
+                zipUrl: parsedBody.data.zipUrl,
+            }
+        })
+
+        // Fire training request to Modal with the modelId
+        console.log(`Sending training request to Modal for model ${data.id}`);
+        console.log(`Modal URL: ${process.env.MODAL_BASE_URL}`);
+        await modalModel.trainModel(parsedBody.data.zipUrl, parsedBody.data.name, data.id);
+
+        res.json({
+            modelId: data.id
+        })
+    } catch (error: any) {
+        console.error("Training request failed:", error?.message || error);
+        res.status(500).json({
+            message: "Training request failed",
+            error: error?.message || "Unknown error"
         })
     }
-
-    // Create DB record first so we have the modelId to send to Modal
-    const data = await prismaClient.model.create({
-        data: {
-            name: parsedBody.data.name,
-            type: parsedBody.data.type,
-            age: parsedBody.data.age,
-            ethnicity: parsedBody.data.ethnicity as EthnicityEnum,
-            eyeColor: parsedBody.data.eyeColor,
-            bald: parsedBody.data.bald,
-            userId: req.userId!,
-            zipUrl: parsedBody.data.zipUrl,
-        }
-    })
-
-    // Fire training request to Modal with the modelId
-    await modalModel.trainModel(parsedBody.data.zipUrl, parsedBody.data.name, data.id);
-
-    res.json({
-        modelId: data.id
-    })
 });
 
 app.post("/ai/generate", authMiddleware, async (req, res) => {
