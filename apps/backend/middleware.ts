@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 // Extend Express Request interface to include userId
 declare global {
@@ -39,4 +40,19 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
             message: "Error While decoding"
         })
     }
+}
+
+export function verifyModalWebhook(req: Request): boolean {
+    const signature = req.headers["x-modal-signature"] as string;
+    
+    if(!signature) {
+        return false;
+    }
+
+    const expected = crypto.createHmac("sha256", process.env.MODAL_WEBHOOK_SECRET!).update(JSON.stringify(req.body)).digest("hex");
+
+    return crypto.timingSafeEqual(
+        Buffer.from(signature),
+        Buffer.from(expected)
+    );
 }

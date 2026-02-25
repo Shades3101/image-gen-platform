@@ -3,16 +3,12 @@ import { TrainModel, GenerateImage, GenerateImageFromPack } from "common/types";
 import { prismaClient, EthnicityEnum } from "db";
 
 import { S3Client } from "bun";
-import { FalAIModel } from "./models/FalAIModel";
 import cors from "cors";
-import { authMiddleware } from "./middleware";
-import { fal } from "@fal-ai/client";
-
-
+import { authMiddleware, verifyModalWebhook } from "./middleware";
+import { ModalModel } from "./models/ModalModel";
 
 const PORT = Number(process.env.PORT ?? 8080);
-
-const falAiModel = new FalAIModel();
+const modalModel = new ModalModel();
 
 const app = express();
 app.use(cors({
@@ -45,7 +41,6 @@ app.get("/pre-signed-url", async (req, res) => {
 
 app.post("/ai/training", authMiddleware, async (req, res) => {
     const parsedBody = TrainModel.safeParse(req.body);
-    const images = req.body.images;
 
     if (!parsedBody.success) {
         return res.status(411).json({
@@ -53,8 +48,7 @@ app.post("/ai/training", authMiddleware, async (req, res) => {
         })
     }
 
-    const { request_id, response_url } = await falAiModel.trainModel(parsedBody.data.zipUrl, parsedBody.data.name);
-
+    // Create DB record first so we have the modelId to send to Modal
     const data = await prismaClient.model.create({
         data: {
             name: parsedBody.data.name,
@@ -65,15 +59,15 @@ app.post("/ai/training", authMiddleware, async (req, res) => {
             bald: parsedBody.data.bald,
             userId: req.userId!,
             zipUrl: parsedBody.data.zipUrl,
-            falAiRequest: request_id,
-
         }
     })
+
+    // Fire training request to Modal with the modelId
+    await modalModel.trainModel(parsedBody.data.zipUrl, parsedBody.data.name, data.id);
 
     res.json({
         modelId: data.id
     })
-
 });
 
 app.post("/ai/generate", authMiddleware, async (req, res) => {
@@ -97,17 +91,17 @@ app.post("/ai/generate", authMiddleware, async (req, res) => {
         })
     }
 
-    const { request_id, response_url } = await falAiModel.generateImage(parsedBody.data.prompt, model?.tensorPath)
-
+    // Create DB record first so we have the imageId to send to Modal
     const data = await prismaClient.outputImages.create({
         data: {
             prompt: parsedBody.data.prompt,
             userId: req.userId!,
-            modelId: parsedBody.data.prompt,
-            imageUrl: "",
-            falAiRequest: request_id
+            modelId: parsedBody.data.modelId,
         }
     })
+
+    // Fire generation request to Modal with the imageId
+    await modalModel.generateImage(parsedBody.data.prompt, parsedBody.data.modelId, data.id);
 
     res.json({
         imageId: data.id
@@ -141,17 +135,21 @@ app.post("/pack/generate", authMiddleware, async (req, res) => {
         })
     }
 
-    let requestIds: { request_id: string }[] = await Promise.all(prompts.map((prompt: { prompt: string }) => falAiModel.generateImage(prompt.prompt, model.tensorPath!)))
-
+    // Create all output image records first so we have imageIds
     const images = await prismaClient.outputImages.createManyAndReturn({
-        data: prompts.map((prompt: { prompt: string }, index: number) => ({
+        data: prompts.map((prompt: { prompt: string }) => ({
             prompt: prompt.prompt,
             userId: req.userId!,
             modelId: parsedBody.data.modelId,
-            imageUrl: "",
-            falAiRequest: requestIds[index]?.request_id
         }))
     })
+
+    // Fire all generation requests to Modal in parallel
+    await Promise.all(
+        images.map((image, index) =>
+            modalModel.generateImage(prompts[index]!.prompt, parsedBody.data.modelId, image.id)
+        )
+    );
 
     res.json({
         images: images.map((image: { id: string }) => image.id)
@@ -208,69 +206,92 @@ app.get("/models", authMiddleware, async (req, res) => {
     })
 })
 
-app.post("/fal-ai/webhook/train", async (req, res) => {
-    console.log("/fal-ai/webhook/train")
-    console.log(req.body)
-    //update the status of the image in db
-    const requestId = req.body.request_id as string;
+app.post("/modal/webhook/train", async (req, res) => {
 
-    const result = await fal.queue.result("fal-ai/flux-lora", {
-        requestId
-    })
+    if (!verifyModalWebhook(req)) {
+        return res.status(401).json({
+            message: "Invalid Signature "
+        });
+    }
 
-    const { imageUrl } = await falAiModel.generateImageSync(req.body.tensor_Path)
+    const { modelId, status, tensorPath, thumbnailUrl, error } = req.body;
 
-    await prismaClient.model.updateMany({
+    if (status === "Failed") {
+        console.error(`Training Failed For Model ${modelId}: ${error}`);
+
+        await prismaClient.model.update({
+            where: {
+                id: modelId
+            },
+            data: {
+                trainingStatus: "Failed"
+            }
+        })
+
+        return res.json({
+            message: "Failure Recorded"
+        });
+    }
+
+    // Thumbnail was generated and uploaded on the Modal side during training
+    await prismaClient.model.update({
         where: {
-            falAiRequest: requestId
+            id: modelId
         },
         data: {
             trainingStatus: "Generated",
-            tensorPath: req.body.tensor_Path,
-            thumbnail: imageUrl
+            tensorPath,
+            thumbnail: thumbnailUrl,
         }
     })
 
-
     res.json({
         message: "Webhook received"
-    })
+    });
 })
 
-app.post("/fal-ai/webhook/image", async (req, res) => {
-    console.log("/fal-ai/webhook/image")
-    console.log(req.body)
-    //update the status of the image in db
-    const request_id = req.body.request_id as string;
+app.post("/modal/webhook/image", async (req, res) => {
 
-    if (req.body.status === "ERROR") {
-        res.status(411).json({});
-        prismaClient.outputImages.updateMany({
-            where: {
-                falAiRequest: request_id
-            },
-            data: {
-                status: "Failed",
-                imageUrl: req.body.payload.images[0].url
-            }
-        })
-        return;
+    if (!verifyModalWebhook(req)) {
+
+        return res.status(401).json({
+            message: "Invalid signature"
+        });
     }
 
-    await prismaClient.outputImages.updateMany({
+    const { imageId, status, imageUrl, error } = req.body;
+
+    if (status === "Failed") {
+        console.error(`Image generation failed for ${imageId}: ${error}`);
+
+        await prismaClient.outputImages.update({
+            where: {
+                id: imageId
+            },
+            data: {
+                status: "Failed"
+            },
+        });
+
+        return res.json({
+            message: "Failure recorded"
+        });
+    }
+
+    await prismaClient.outputImages.update({
         where: {
-            falAiRequest: request_id
+            id: imageId
         },
         data: {
             status: "Generated",
-            imageUrl: req.body.payload.images[0].url
-        }
-    })
+            imageUrl,
+        },
+    });
 
     res.json({
         message: "Webhook received"
-    })
-})
+    });
+});
 
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server is running on ${PORT}`);
