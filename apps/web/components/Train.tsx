@@ -17,7 +17,7 @@ import { BACKEND_URL } from "@/app/config";
 
 // Define types matching the Zod schema
 type ModelType = "Man" | "Woman" | "Others";
-type Ethnicity = "White" | "Black" | "Asian American" | "East Asian" | "South East Asian" | "South Asian" | "Middle Eastern" | "Pacific" | "Hispanic";
+type Ethnicity = "White" | "Black" | "AsianAmerican" | "EastAsian" | "SouthEastAsian" | "SouthAsian" | "MiddleEastern" | "Pacific" | "Hispanic";
 type EyeColor = "Brown" | "Blue" | "Hazel" | "Gray";
 
 export default function Train() {
@@ -73,7 +73,7 @@ export default function Train() {
             </CardHeader>
             <CardContent>
                 <div className="grid w-full items-center gap-4">
-                    
+
                     <div className="flex gap-4">
                         <div className="grid gap-2 flex-1">
                             <Label htmlFor="name">Name</Label>
@@ -113,11 +113,13 @@ export default function Train() {
                                 <SelectContent position="popper">
                                     <SelectItem value="White">White</SelectItem>
                                     <SelectItem value="Black">Black</SelectItem>
-                                    <SelectItem value="Asian American">Asian American</SelectItem>
-                                    <SelectItem value="East Asian">East Asian</SelectItem>
-                                    <SelectItem value="South East Asian">South East Asian</SelectItem>
-                                    <SelectItem value="South Asian">South Asian</SelectItem>
-                                    <SelectItem value="Middle Eastern">Middle Eastern</SelectItem>
+                                    <SelectItem value="AsianAmerican">Asian American</SelectItem>
+                                    <SelectItem value="EastAsian">East Asian</SelectItem>
+                                    <SelectItem value="SouthEastAsian">South East Asian</SelectItem>
+                                    <SelectItem value="SouthAsian">South Asian</SelectItem>
+                                    <SelectItem value="MiddleEastern">Middle Eastern</SelectItem>
+                                    <SelectItem value="Pacific">Pacific</SelectItem>
+                                    <SelectItem value="Hispanic">Hispanic</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

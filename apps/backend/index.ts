@@ -7,6 +7,7 @@ import cors from "cors";
 import { authMiddleware, verifyModalWebhook } from "./middleware";
 import { ModalModel } from "./models/ModalModel";
 
+
 const PORT = Number(process.env.PORT ?? 8080);
 const modalModel = new ModalModel();
 
