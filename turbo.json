@@ -3,11 +3,17 @@
   "tasks": {
     "generate": {
       "cache": false,
-      "env": ["DATABASE_URL"]
+      "env": [
+        "DATABASE_URL"
+      ]
     },
     "build": {
-      "dependsOn": ["^build"],
-      "env": ["DATABASE_URL"],
+      "dependsOn": [
+        "^build"
+      ],
+      "env": [
+        "DATABASE_URL"
+      ],
       "outputs": [
         "dist/**",
         ".next/**",
@@ -17,18 +23,30 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": [
+        "*"
+      ]
     },
     "start": {
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": [
+        "*"
+      ]
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": [
+        "^lint"
+      ]
     },
     "check-types": {
-      "dependsOn": ["^check-types"]
+      "dependsOn": [
+        "^check-types"
+      ]
     }
   }
 }
