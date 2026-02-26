@@ -40,5 +40,4 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
-CHANGELOG.md
 MODAL_MIGRATION_GUIDE.md

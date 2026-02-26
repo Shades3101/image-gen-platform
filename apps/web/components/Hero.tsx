@@ -11,8 +11,6 @@ import {
 import { ClerkProvider, SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, } from '@clerk/nextjs'
 import { Button } from "./ui/button"
 import { useRouter } from "next/navigation"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Info } from "lucide-react"
 
 export function Hero() {
 
@@ -20,16 +18,7 @@ export function Hero() {
 
     return <div className="flex justify-center">
         <div className="max-w-6xl ">
-            <div className="pb-8 pt-8">
-                <Alert variant="destructive">
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>Heads up!</AlertTitle>
-                    <AlertDescription>
-                        We are currently migrating our GPU infrastructure from Fal.ai to Modal.com. Image generation is temporarily unavailable.
-                    </AlertDescription>
-                </Alert>
-            </div>
-            <h1 className="text-8xl p-2 text-center pb-4">
+            <h1 className="text-8xl p-2 text-center pb-4 pt-8">
                 Generate Images for yourself and your loved ones
             </h1>
             <Carousel>

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/Shades3101/image-gen-platform/main/apps/web/public/turborepo-dark.svg" alt="PixGen Logo" width="120" />
+  <img src="https://raw.githubusercontent.com/Shades3101/PixGen/main/apps/web/public/turborepo-dark.svg" alt="PixGen Logo" width="120" />
   <h1>PixGen</h1>
   <p><strong>The Ultimate AI Photo Generation & Personalized Model Fine-Tuning Platform</strong></p>
 
@@ -49,20 +49,20 @@ graph TD
     Backend -->|Return S3/R2 URL| Frontend
     Frontend -->|Upload Zip| S3[Cloudflare R2 / AWS S3]
     Frontend -->|Trigger Training| Backend
-    Backend -->|Start LoRA Training| FalAI[Fal.ai GPU Cluster]
-    FalAI -- Webhook (Training Complete) --> Backend
+    Backend -->|Start LoRA Training| Modal[Modal.com GPU Cluster]
+    Modal -- Webhook (Training Complete) --> Backend
     Backend -- Update Status --> DB[(PostgreSQL)]
     
     User -->|Generate Image| Frontend
     Frontend -->|Request Generation| Backend
-    Backend -->|Inference Request| FalAI
-    FalAI -- Webhook (Image Ready) --> Backend
+    Backend -->|Inference Request| Modal
+    Modal -- Webhook (Image Ready) --> Backend
     Backend -- Store Image URL --> DB
 ```
 
 1. **Upload & Zip**: User selects 5-20 photos. The frontend zips them and securely uploads to Object Storage (S3/R2) using a pre-signed URL.
-2. **Training**: The backend triggers a Fal.ai Flux LoRA training job using the uploaded zip.
-3. **Async Webhooks**: Fal.ai notifies the backend via webhooks when training is done or when images are generated, ensuring non-blocking operations.
+2. **Training**: The backend triggers a Modal.com Flux LoRA training job using the uploaded zip.
+3. **Async Webhooks**: Modal notifies the backend via webhooks when training is done or when images are generated, ensuring non-blocking operations.
 4. **Inference**: Users select a trained model (or a generic one) and a "Prompt Pack" style to generate new images.
 
 ---
@@ -97,7 +97,7 @@ graph TD
 | **Database** | [PostgreSQL](https://www.postgresql.org/) | Robust relational data storage. |
 | **ORM** | [Prisma](https://www.prisma.io/) | Modern database toolkit and type-safe client. |
 | **Styling** | [Tailwind CSS 4](https://tailwindcss.com/) | Utility-first CSS for rapid, modern UI building. |
-| **AI Workload**| [Fal.ai](https://fal.ai) | Standard GPU-accelerated model training and inference. |
+| **AI Workload**| [Modal.com](https://modal.com) | Standard GPU-accelerated model training and inference. |
 | **Storage** | [Cloudflare R2](https://www.cloudflare.com/developer-platform/r2/) | S3-compatible object storage for datasets. |
 
 ---
@@ -109,6 +109,7 @@ PixGen/
 ├── apps/
 │   ├── web/               # Next.js Frontend (React 19)
 │   ├── backend/           # API Service (Express + Bun)
+│   ├── modal-compute/     # Modal compute workers (Python)
 ├── packages/
 │   ├── common/            # Shared Zod schemas, Types & Constants
 │   ├── db/                # Prisma Schema & Database Client
@@ -137,14 +138,14 @@ The core entities in the PostgreSQL database:
 ### Prerequisites
 - **Bun**: `curl -fsSL https://bun.sh/install | bash`
 - **PostgreSQL**: Local instance or remote provider (Supabase, Neon).
-- **Accounts**: Clerk (Auth), Cloudflare R2/S3 (Storage), [Fal.ai](https://fal.ai) (AI Workload).
+- **Accounts**: Clerk (Auth), Cloudflare R2/S3 (Storage), [Modal.com](https://modal.com) (AI Workload).
 
 ### Step-by-Step Installation
 
 1. **Clone & Install**:
    ```bash
-   git clone https://github.com/Shades3101/image-gen-platform.git
-   cd image-gen-platform
+   git clone https://github.com/Shades3101/PixGen.git
+   cd PixGen
    bun install
    ```
 
@@ -162,8 +163,9 @@ The core entities in the PostgreSQL database:
    BUCKET_NAME="pixgen-models"
    # Auth & AI
    AUTH_JWT_KEY="your-rsa-public-key"
-   FAL_KEY="your-fal-ai-key"
-   WEBHOOK_BASE_URL="http://localhost:3001/fal-ai/webhook"
+   MODAL_WEBHOOK_SECRET="your-modal-webhook-secret"
+   MODAL_BASE_URL="https://your-modal-app-url"
+   WEBHOOK_BASE_URL="your-ngrok-or-prod-url"
    # DB
    DATABASE_URL="postgresql://user:password@localhost:5432/pixgen"
    ```

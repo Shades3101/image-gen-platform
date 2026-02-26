@@ -31,7 +31,7 @@ gpu_image = (
         "ftfy~=6.1.0",
         "huggingface-hub==0.31.0",
         "numpy<2",
-        "peft==0.11.1",
+        "peft==0.15.2",
         "pydantic==2.9.2",
         "sentencepiece>=0.1.91,!=0.1.92",
         "smart_open~=6.4.0",
