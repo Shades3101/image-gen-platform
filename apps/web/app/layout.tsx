@@ -3,7 +3,6 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider"
 import { ClerkProvider } from '@clerk/nextjs'
-import { AppBar } from "@/components/AppBar";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -15,8 +14,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "AI Photo Generator by PixGen",
-  description: "AI Photo Generator",
+  title: "PixGen — AI Image Generator",
+  description: "Generate stunning images and train your own AI models with PixGen",
 };
 
 export default function RootLayout({
@@ -27,9 +26,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <ClerkProvider>
-        <body className={`${geistSans.variable} ${geistMono.variable}`}>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-            <AppBar />
+        <body className={`${geistSans.variable} ${geistMono.variable} bg-background text-foreground font-sans antialiased`}>
+          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
             {children}
           </ThemeProvider>
         </body>

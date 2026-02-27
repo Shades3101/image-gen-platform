@@ -2,53 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
-## 2026-02-26
 
-### Removed
-- **Fal.ai Integration**: Completely removed all Fal.ai dependencies and legacy logic.
-  - Deleted `apps/backend/models/FalAIModel.ts` and `apps/backend/models/BaseModel.ts`.
-  - Removed `@fal-ai/client` from `apps/backend/package.json`.
-  - Removed the "Migration Alert" banner and unused imports from `apps/web/components/Hero.tsx`.
-  - Polished `README.md` to remove Fal.ai from architecture diagrams and environment configuration guides.
+## 2026-02-28
 
 ### Added
-- **Modal.com Compute Endpoints** (`apps/modal-compute/src/main.py`): 
-  - `start_training`: Implemented Flux LoRA training endpoints utilizing `A100` and `A10G` GPU profiles.
-  - `generate_image`: Formed an inference function for generating images via Modal instead of local inference.
-  - `verify_signature`: Wrote a webhook signature verification pipeline to authenticate status callbacks against `MODAL_WEBHOOK_SECRET`.
-  - Added a `requirements.txt` specifically for the Modal environment to manage Python dependencies (`modal`, `fastapi`).
-- **Backend Modal Abstract** (`apps/backend/models/ModalModel.ts`): 
-  - `trainModel` and `generateImage`: Added bridge interface classes within the Node.js Express server to facilitate executing Modal API payloads.
-- **Deployment Workflows** (`turbo.json`, `packages/db/package.json`):
-  - `generate`: Introduced a formal task sequence across Turborepo to reliably trigger Prisma client builds.
-  - `postinstall`: Included a script inside `packages/db` that forces `prisma generate`, resolving "missing database Prisma client" errors.
-- **Developer Experience** (`.env.example`):
-  - Added comprehensive templates specifying required credentials (`FRONTEND_URL`, `MODAL_WEBHOOK_SECRET`) for developers.
+- **Premium UI Component Library**: Integrated a comprehensive suite of polished, accessible components in `apps/web/components/ui/`:
+  - `Badge`, `Separator`, `Slider`, `Sonner`, `Toast`, `Toaster`, `Toggle`, and `Tooltip`.
+  - Expanded `Button` and `Textarea` capabilities with enhanced variant support.
+- **Enhanced Visual Assets**: Added high-quality showcase images and branding assets for the "PixGen" identity (`apps/web/public/`).
+- **Dashboard & Landing Layouts**: Introduced new `landing` and `dashboard` component directories to house modern, feature-rich UI sections.
 
 ### Changed
-- **Server Dynamic Configurations** (`apps/backend/index.ts`, `apps/backend/package.json`):
-  - `app.listen()`: Replaced hardcoded localhost bindings with `0.0.0.0` to permit external network routing (e.g. for Render).
-  - Refactored server configuration to inherit the explicit process `PORT` environment variable seamlessly.
-  - Integrated `bun` into the primary sequence for faster server instantiations.
-  - `build`: Introduced production build compiling (`tsc -b`) configured within `tsconfig.json`.
-  - Removed debug `console.log` statements and unused `USER_ID` constants across the file.
-- **Global Project Rebranding** (`apps/web/app/config.ts`, `apps/web/app/layout.tsx`, `apps/web/components/AppBar.tsx`):
-  - Renamed operations from "PhotoAI" / "Pic-X" to its finalized metadata name "**PixGen**". 
-- **Turborepo Proxies and Task Configurations** (`turbo.json`):
-  - Restructured dependency pipelines for explicit passthroughs (`"passThroughEnv": ["*"]`). By securely exposing injected environment secrets dynamically across `build`, `start`, and `generate` tasks, the apps avoid `undefined` reference errors.
-- **Visuals and Hero Component Enhancements** (`apps/web/components/Hero.tsx`):
-  - `Hero()`: Exchanged broken image placeholders for cohesive, selected, high-quality Unsplash source graphics.
-  - `Hero()`: Built a "Migration Alert" UI component notifying end-users of temporary backend transition downtime.
-- **Monorepo Dependency Refresh** (`package.json`, `bun.lock`):
-  - Updated major architectural libraries (`next` to 16.1.6, `turbo` to 2.8.9, `react` to 19.2.4). 
+- **Branding & Identity**: Full migration to the **PixGen** brand across `layout.tsx`, `page.tsx`, and site metadata.
+- **Global Aesthetics**: Refined `apps/web/app/globals.css` with a modern dark-mode color palette, custom utility classes, and optimized typography.
+- **Infrastructure & Dependencies**:
+  - Relaxed dependency version ranges in `apps/modal-compute/requirements.txt` (Modal, Click, Typer) for better environment compatibility.
+  - Refactored `packages/db/index.ts` to implement a robust Prisma Singleton pattern with PostgreSQL adapter support.
+  - Updated monorepo dependencies in `package.json` and `bun.lock` for better stability.
 
 ### Fixed
-- **TypeScript Ethnicity Enum Assignments** (`apps/web/components/Train.tsx`, `packages/common/types.ts`):
-  - `Train()`: Investigated and resolved a restrictive type assignment constraint. The localized `Ethnicity` enum keys from the Next.js training forms were misaligned against the expected schema definitions.
-- **Container Build Deployment Errors** (`apps/modal-compute/src/main.py`):
-  - Fixed persistent `FileNotFoundError` scenarios encountered during the `modal deploy` image building process. Adjusted file copying and absolute pathname resolutions handling `.env` dependencies.
-- **CORS Error in Production** (`apps/backend/index.ts`):
-  - API setup: Requests from the frontend to the backend were dropping preflight checks due to absent origins. Implemented the official `cors` Express extension securely.
+- **Next.js Build Compatibility**: 
+  - Wrapped `useSearchParams` dependent logic in `DashboardContent` with `<Suspense />` boundaries to resolve build-time de-optimization errors.
+  - Corrected `next.config.js` to ensure reliable static generation.
+- **Git & Environment Hygiene**: 
+  - Improved `.gitignore` patterns to accurately filter Bun and Next.js temporary files.
+  - Resolved `CORS` and environment variable passthrough issues in backend routing.
+
+### Removed
+- **Legacy UI Components**: Performed a major codebase cleanup by deleting 10 redundant top-level components in `apps/web/components/` after verifying full feature parity in the new modular architecture:
+  - `AppBar.tsx` & `Hero.tsx` (Replaced by `landing/Navbar` and `landing/HeroSection`).
+  - `Train.tsx` (Replaced by the multi-step `dashboard/TrainTab`).
+  - `Packs.tsx`, `PacksClient.tsx`, & `PackCard.tsx` (Replaced by `dashboard/PacksTab`).
+  - `Camera.tsx`, `GenerateImage.tsx`, `ImageCard.tsx`, & `Model.tsx` (Replaced by optimized `dashboard/` tabs).
+- **Fal.ai Integration**: Completely purged all remaining Fal.ai logic, model definitions (`FalAIModel.ts`), and package dependencies in favor of the new Modal compute pipeline.
 
 ## 2026-02-14
 
