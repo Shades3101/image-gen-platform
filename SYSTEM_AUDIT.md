@@ -252,7 +252,9 @@ To move beyond the current development state, the following changes are required
 
 ## 📅 Tracking History
 - **2026-02-26**: Comprehensive system architecture audit performed by Antigravity.
-- **2026-02-28 (Execution)**: Addressed critical build failures, codebase hygiene, and branding overhaul:
+- **2026-02-28 (Execution)**: Addressed critical build failures, codebase hygiene, branding overhaul, and performance bottlenecks:
+  - **Asynchronous Training Logic**: Refactored the backend to fire-and-forget Modal training jobs, resolving the "Step 3" frontend hang where users were stuck on a loader for ~10 minutes.
+  - **Request Robustness**: Added background `try-catch` blocks to Modal compute triggers to safeguard against unhandled promise rejections.
   - Fixed Next.js build de-optimization via `<Suspense />` boundaries.
   - Purged Fal.ai dependencies and legacy UI components (10 components removed).
   - Implemented PixGen branding and modern dark-mode aesthetics.

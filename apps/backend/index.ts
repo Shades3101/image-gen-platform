@@ -69,7 +69,14 @@ app.post("/ai/training", authMiddleware, async (req, res) => {
         // Fire training request to Modal with the modelId
         console.log(`Sending training request to Modal for model ${data.id}`);
         console.log(`Modal URL: ${process.env.MODAL_BASE_URL}`);
-        await modalModel.trainModel(parsedBody.data.zipUrl, parsedBody.data.name, data.id);
+        (async () => {
+            try {
+                await modalModel.trainModel(parsedBody.data.zipUrl, parsedBody.data.name, data.id);
+                console.log(`Modal training request accepted for model ${data.id}`);
+            } catch (err) {
+                console.error(`Modal training request failed for model ${data.id}:`, err);
+            }
+        })();
 
         res.json({
             modelId: data.id

@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - **AI Model Pipeline**: Successfully migrated from FLUX.1-dev to SDXL 1.0. Set training and inference endpoints to use the T4 GPU, reducing costs significantly ($0.59/hr). Baked SDXL model weights directly into the Modal Docker image for instant container cold starts.
+- **Backend API**: Refactored the `/ai/training` endpoint to execute Modal training asynchronously (fire-and-forget task). This prevents frontend UI freezes by responding immediately rather than waiting for long-running compute jobs.
 - **Branding & Identity**: Full migration to the **PixGen** brand across `layout.tsx`, `page.tsx`, and site metadata.
 - **Global Aesthetics**: Refined `apps/web/app/globals.css` with a modern dark-mode color palette, custom utility classes, and optimized typography.
 - **Infrastructure & Dependencies**:

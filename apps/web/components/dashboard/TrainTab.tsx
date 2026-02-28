@@ -48,12 +48,19 @@ const TrainTab = () => {
         try {
             const token = await getToken();
             await axios.post(`${BACKEND_URL}/ai/training`, {
-                name, zipUrl, type, age, ethnicity, eyeColor, bald
+                name,
+                zipUrl,
+                type,
+                age,
+                ethnicity,
+                eyeColor,
+                bald
             }, {
                 headers: {
                     Authorization: `Bearer ${token}`
                 }
             });
+            console.log("Training request sent successfully");
             setSubmitted(true);
             setStep(3);
         } catch (e) {
