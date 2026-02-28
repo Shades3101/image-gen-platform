@@ -144,9 +144,7 @@ This file tracks identified issues, bugs, and areas for improvement in the PixGe
 ## 🐍 Modal Compute Issues
 
 ### GPU Service (`apps/modal-compute/src/main.py`)
-- [ ] **No Retry Logic on Webhook Failures**: If the backend webhook endpoint is down when Modal tries to send results, training/generation results are silently lost.
-  - *Impact*: Users see "Pending" forever with no way to recover completed work
-  - *Effort*: Medium (implement exponential backoff retry on webhook send)
+- [x] **No Retry Logic on Webhook Failures**: Fixed by adding 3-attempt exponential backoff retry and a 60-second timeout to mitigate Render backend cold wake-ups.
 
 - [ ] **Hardcoded Training Parameters**: Resolution (512), batch size (1), and LoRA rank (8) are fixed in the `TrainConfig` dataclass with no API override.
   - *Impact*: No ability to tune quality vs. cost per training run
@@ -262,4 +260,7 @@ To move beyond the current development state, the following changes are required
   - Integrated Radix UI / Shadcn suite (`Sonner`, `Badge`, `Slider`, etc.).
   - Implemented Prisma Singleton pattern for database stability.
   - Refined `.gitignore` for the monorepo environment.
+  - Fully migrated from FLUX.1-dev to SDXL 1.0 (saving ~$2/hr per job using T4 GPUs).
+  - Resolved `Float/Half` mixed-precision SDXL generation bugs by pinning `peft==0.15.2` and `diffusers==0.31.0`.
+  - Configured successful Modal → Render webhook pipeline mapping (addressed HMAC JSON mismatches + added 60-second timeouts).
 - **Still Pending**: Security hardening (Rate limiting, Auth on pre-signed URLs), Console log cleanup, and UI library consolidation remain high-priority tasks for the next sprint.

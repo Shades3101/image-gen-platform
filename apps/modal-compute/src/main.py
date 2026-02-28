@@ -12,8 +12,10 @@ app = modal.App("pixgen-gpu")
 volume = modal.Volume.from_name("pixgen_models", create_if_missing=True)
 MODEL_DIR = "/models"
 
-# Base model for Flux LoRA training
-BASE_MODEL = "black-forest-labs/FLUX.1-dev"
+# Base model for SDXL LoRA training
+# NOTE: To upgrade to FLUX.1-dev later (better quality, needs A100-40GB):
+#   Change to: BASE_MODEL = "black-forest-labs/FLUX.1-dev"
+BASE_MODEL = "stabilityai/stable-diffusion-xl-base-1.0"
 DIFFUSERS_REPO = "https://github.com/huggingface/diffusers.git"
 DIFFUSERS_REF = "v0.31.0"  # pinned for reproducibility
 
@@ -25,23 +27,23 @@ gpu_image = (
     modal.Image.debian_slim(python_version="3.10")
     .apt_install("git")
     .uv_pip_install(
-        "accelerate==0.31.0",
+        "accelerate>=1.1.0",
         "datasets~=2.13.0",
         "fastapi[standard]==0.115.4",
         "ftfy~=6.1.0",
-        "huggingface-hub==0.31.0",
+        "huggingface-hub>=0.28.0",
         "numpy<2",
-        "peft==0.15.2",
-        "pydantic==2.9.2",
+        "peft==0.15.2",  # pinned: diffusers 0.31.0 needs >=0.6.0, training script needs use_dora support
+        "pydantic>=2.9.0",
         "sentencepiece>=0.1.91,!=0.1.92",
         "smart_open~=6.4.0",
-        "starlette==0.41.2",
-        "transformers~=4.41.2",
-        "torch~=2.2.0",
-        "torchvision~=0.16",
-        "triton~=2.2.0",
-        "wandb==0.17.6",
-        "diffusers>=0.25.0",
+        "starlette>=0.40.0",
+        "transformers==4.48.0",  # pinned: newer versions break diffusers 0.31.0 (FLAX_WEIGHTS_NAME removed)
+        "torch>=2.4.0",
+        "torchvision>=0.19.0",
+        "triton>=2.3.0",
+        "wandb>=0.18.0",
+        "diffusers==0.31.0",  # pinned to match training script (DIFFUSERS_REF)
         "boto3>=1.34.0",
         "requests>=2.31.0",
         "safetensors>=0.4.0",
@@ -53,9 +55,37 @@ gpu_image = (
     # Clone diffusers repo and install training script requirements
     .run_commands(
         f"git clone --depth 1 --branch {DIFFUSERS_REF} {DIFFUSERS_REPO} /diffusers",
-        "pip install -r /diffusers/examples/dreambooth/requirements_flux.txt || true",
+        # NOTE: Don't install requirements.txt — it pins peft==0.7.0 which
+        # downgrades our peft and breaks use_dora. Only install the extra deps.
+        "pip install tensorboard Jinja2",
     )
 )
+
+def download_models():
+    """
+    Download the SDXL base model and VAE at image build time.
+    Baking these into the Modal image prevents a 5-minute 6.5GB download
+    every time a new container boots up (cold start).
+    """
+    import torch
+    from diffusers import StableDiffusionXLPipeline, AutoencoderKL
+
+    print("Downloading SDXL-fp16 VAE...")
+    AutoencoderKL.from_pretrained(
+        "madebyollin/sdxl-vae-fp16-fix", 
+        torch_dtype=torch.float16
+    )
+
+    print("Downloading SDXL base model (fp16 variant)...")
+    StableDiffusionXLPipeline.from_pretrained(
+        BASE_MODEL,
+        torch_dtype=torch.float16,
+        variant="fp16",
+        use_safetensors=True,
+    )
+
+# Run the download function as the final step in the image build
+gpu_image = gpu_image.run_function(download_models)
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -64,21 +94,21 @@ gpu_image = (
 
 @dataclass
 class TrainConfig:
-    """Hyperparameters for Flux LoRA DreamBooth training on faces.
+    """Hyperparameters for SDXL LoRA DreamBooth training on faces.
     
     Budget-optimized for $5 total:
-      - L4 GPU (~$0.80/hr) + 500 steps ≈ $0.08–$0.12 per training run
-      - ~30–50 training runs possible within $5
+      - T4 GPU (~$0.59/hr) + 500 steps ≈ $0.08 per training run
+      - ~60 training runs + 500s of inferences within $5
     """
-    max_train_steps: int = 500           # ~8 min on L4, enough for 10-20 face images
+    max_train_steps: int = 500           # ~8 min on T4, enough for 10-20 face images
     learning_rate: float = 1e-4          # standard for LoRA
-    lora_rank: int = 8                   # smaller rank = faster + less VRAM for L4
-    resolution: int = 512                # 512 to fit in L4's 24GB VRAM
-    train_batch_size: int = 1            # keep at 1 to fit in 24GB L4
+    lora_rank: int = 8                   # good balance of quality vs speed
+    resolution: int = 512                # 512 for T4 (use 1024 on L4/A100 for better quality)
+    train_batch_size: int = 1            # keep at 1 for T4's 16GB VRAM
     gradient_accumulation_steps: int = 2 # effective batch size of 2
     lr_scheduler: str = "constant"       # constant works well for short LoRA runs
     seed: int = 42
-    mixed_precision: str = "fp16"        # FP16 for L4/T4 (bf16 needs A100+)
+    mixed_precision: str = "no"          # fp32: fp16 has known gradient scaler bugs with peft LoRA
     gradient_checkpointing: bool = True  # save VRAM at slight speed cost
 
 
@@ -92,30 +122,37 @@ def _sign_payload(payload: dict) -> str:
     IMPORTANT: The Express backend verifies with:
         crypto.createHmac("sha256", secret).update(JSON.stringify(req.body)).digest("hex")
     
-    JS JSON.stringify produces: {"key": "value"} (space after colon)
-    Python json.dumps default also produces: {"key": "value"} (space after colon)
-    
-    So we use default separators to ensure signatures match.
+    JS JSON.stringify produces compact JSON: {"key":"value"} (NO spaces)
+    Python json.dumps must match exactly with separators=(",", ":")
     """
     import json, hmac, hashlib
     secret = os.environ["MODAL_WEBHOOK_SECRET"]
-    body = json.dumps(payload, separators=(", ", ": "))
+    body = json.dumps(payload, separators=(",", ":"))
     return hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
 
 
 def _send_webhook(webhook_url: str, payload: dict):
-    """Send signed webhook to Express backend."""
-    import requests
+    """Send signed webhook to Express backend (with retry for Render cold starts)."""
+    import requests, time
     signature = _sign_payload(payload)
-    try:
-        requests.post(
-            webhook_url,
-            json=payload,
-            headers={"X-Modal-Signature": signature},
-            timeout=15,
-        )
-    except Exception as e:
-        print(f"[WEBHOOK ERROR] Failed to send webhook: {e}")
+    
+    # Retry up to 3 times — Render free tier can take 30+ seconds to wake up
+    for attempt in range(3):
+        try:
+            resp = requests.post(
+                webhook_url,
+                json=payload,
+                headers={"X-Modal-Signature": signature},
+                timeout=60,  # 60s to handle Render cold starts
+            )
+            print(f"[WEBHOOK] Sent successfully (status {resp.status_code})")
+            return
+        except Exception as e:
+            print(f"[WEBHOOK] Attempt {attempt + 1}/3 failed: {e}")
+            if attempt < 2:
+                time.sleep(5)  # wait 5s before retry
+    
+    print(f"[WEBHOOK ERROR] All 3 attempts failed for {webhook_url}")
 
 
 def _upload_to_s3(image_bytes: bytes, s3_key: str, content_type: str = "image/png") -> str:
@@ -134,7 +171,9 @@ def _upload_to_s3(image_bytes: bytes, s3_key: str, content_type: str = "image/pn
         Body=image_bytes,
         ContentType=content_type,
     )
-    return f"{os.environ['S3_ENDPOINT']}/{bucket}/{s3_key}"
+    # Use public URL (S3_ENDPOINT is the private API endpoint, not browser-accessible)
+    public_url = os.environ["S3_PUBLIC_URL"]
+    return f"{public_url}/{s3_key}"
 
 
 def _pil_to_bytes(image) -> bytes:
@@ -185,7 +224,7 @@ def _prepare_training_images(zip_url: str, output_dir: str) -> str:
 
 @app.function(
     image=gpu_image,
-    gpu="L4",                           # L4 ~$0.80/hr (budget-friendly, 24GB VRAM)
+    gpu="T4",                           # T4 ~$0.59/hr (SDXL fits in 16GB VRAM)
     volumes={MODEL_DIR: volume},
     timeout=1200,                      # 20 min safety cap (500 steps ≈ 8 min)
     secrets=[modal.Secret.from_name("PixGen-Secrets")],
@@ -193,7 +232,7 @@ def _prepare_training_images(zip_url: str, output_dir: str) -> str:
 @modal.fastapi_endpoint(method="POST")
 def train(data: dict):
     """
-    Fine-tune FLUX.1-dev with LoRA on user-uploaded face images.
+    Fine-tune SDXL with LoRA on user-uploaded face images.
     
     Expected payload:
     {
@@ -222,10 +261,10 @@ def train(data: dict):
         train_data_dir = _prepare_training_images(zip_url, "/tmp/training_images")
 
         # ── Step 2: Run LoRA fine-tuning via accelerate ─────────
-        #    Uses the official HuggingFace DreamBooth LoRA script
-        #    Reference: https://huggingface.co/docs/diffusers/training/dreambooth#flux
+        #    Uses the official HuggingFace DreamBooth LoRA SDXL script
+        #    Reference: https://huggingface.co/docs/diffusers/training/dreambooth
         
-        training_script = "/diffusers/examples/dreambooth/train_dreambooth_lora_flux.py"
+        training_script = "/diffusers/examples/dreambooth/train_dreambooth_lora_sdxl.py"
         
         # Build the accelerate launch command
         cmd = [
@@ -233,6 +272,7 @@ def train(data: dict):
             "--mixed_precision", config.mixed_precision,
             training_script,
             "--pretrained_model_name_or_path", BASE_MODEL,
+            "--pretrained_vae_model_name_or_path", "madebyollin/sdxl-vae-fp16-fix",  # prevents NaN in fp16
             "--instance_data_dir",             train_data_dir,
             "--output_dir",                    output_dir,
             "--instance_prompt",               f"a photo of {trigger_word} person",
@@ -332,25 +372,28 @@ def train(data: dict):
 def _run_inference(
     lora_weights_path: str,
     prompt: str,
-    num_inference_steps: int = 20,
-    guidance_scale: float = 3.5,
+    num_inference_steps: int = 30,
+    guidance_scale: float = 7.5,
     width: int = 512,
     height: int = 512,
 ):
     """
-    Load FLUX.1-dev + LoRA weights and generate an image.
+    Load SDXL + LoRA weights and generate an image.
     
+    SDXL fits natively in T4's 16GB VRAM — no CPU offloading needed.
     Returns a PIL Image.
     """
     import torch
-    from diffusers import FluxPipeline
+    from diffusers import StableDiffusionXLPipeline
 
     print(f"[INFERENCE] Loading base model: {BASE_MODEL}")
 
-    # Load base Flux pipeline in FP16 for L4/T4
-    pipe = FluxPipeline.from_pretrained(
+    # Load SDXL pipeline in FP16 — fits comfortably in T4's 16GB
+    pipe = StableDiffusionXLPipeline.from_pretrained(
         BASE_MODEL,
         torch_dtype=torch.float16,
+        variant="fp16",
+        use_safetensors=True,
     )
     pipe.to("cuda")
 
@@ -361,12 +404,6 @@ def _run_inference(
         adapter_name="user_lora",
     )
     pipe.set_adapters(["user_lora"], adapter_weights=[1.0])
-
-    # Enable memory-efficient attention if available
-    try:
-        pipe.enable_xformers_memory_efficient_attention()
-    except Exception:
-        pass  # xformers not installed, that's fine
 
     # Generate image
     print(f"[INFERENCE] Generating image: prompt='{prompt[:80]}...'" if len(prompt) > 80 else f"[INFERENCE] Generating image: prompt='{prompt}'")
@@ -394,9 +431,9 @@ def _run_inference(
 
 @app.function(
     image=gpu_image,
-    gpu="T4",                          # T4 ~$0.59/hr (cheapest GPU, 16GB VRAM)
+    gpu="T4",                          # T4 ~$0.59/hr (SDXL fits natively in 16GB)
     volumes={MODEL_DIR: volume},
-    timeout=120,              # 2 min max for inference
+    timeout=120,              # 2 min max for SDXL inference
     max_containers=10,        # max 10 concurrent image generations
     secrets=[modal.Secret.from_name("PixGen-Secrets")],
 )

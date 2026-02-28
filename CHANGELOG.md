@@ -13,14 +13,20 @@ All notable changes to this project will be documented in this file.
 - **Dashboard & Landing Layouts**: Introduced new `landing` and `dashboard` component directories to house modern, feature-rich UI sections.
 
 ### Changed
+- **AI Model Pipeline**: Successfully migrated from FLUX.1-dev to SDXL 1.0. Set training and inference endpoints to use the T4 GPU, reducing costs significantly ($0.59/hr). Baked SDXL model weights directly into the Modal Docker image for instant container cold starts.
 - **Branding & Identity**: Full migration to the **PixGen** brand across `layout.tsx`, `page.tsx`, and site metadata.
 - **Global Aesthetics**: Refined `apps/web/app/globals.css` with a modern dark-mode color palette, custom utility classes, and optimized typography.
 - **Infrastructure & Dependencies**:
+  - Locked core SDXL training dependencies (`diffusers==0.31.0`, `peft==0.15.2`, `transformers==4.48.0`) in `modal-compute/src/main.py` to prevent version clashing and dtype mismatches during mixed-precision training.
   - Relaxed dependency version ranges in `apps/modal-compute/requirements.txt` (Modal, Click, Typer) for better environment compatibility.
   - Refactored `packages/db/index.ts` to implement a robust Prisma Singleton pattern with PostgreSQL adapter support.
   - Updated monorepo dependencies in `package.json` and `bun.lock` for better stability.
 
 ### Fixed
+- **Modal Compute Reliability**: 
+  - Enhanced Modal webhook delivery with a 60-second timeout and a 3-attempt retry logic to handle Render backend cold starts gracefully.
+  - Fixed S3/R2 upload logic to return publicly accessible URLs (`S3_PUBLIC_URL`) instead of private AWS API endpoints for generated images.
+  - Resolved JSON serialization mismatch between Python's `json.dumps()` and Express's `JSON.stringify()` that was causing HMCA signature validation failures for webhooks.
 - **Next.js Build Compatibility**: 
   - Wrapped `useSearchParams` dependent logic in `DashboardContent` with `<Suspense />` boundaries to resolve build-time de-optimization errors.
   - Corrected `next.config.js` to ensure reliable static generation.

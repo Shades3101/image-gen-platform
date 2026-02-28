@@ -17,7 +17,7 @@
 
 ## 🌟 Overview
 
-**PixGen** represents the next generation of personalized AI creativity. Unlike generic image generators, PixGen empowers users to create **their own digital twins** through Flux LoRA fine-tuning. By uploading a small dataset of photos, users can train a custom AI model that understands their unique likeness, allowing them to generate hyper-realistic portraits in any setting, style, or outfit imaginable.
+**PixGen** represents the next generation of personalized AI creativity. Unlike generic image generators, PixGen empowers users to create **their own digital twins** through SDXL LoRA fine-tuning. By uploading a small dataset of photos, users can train a custom AI model that understands their unique likeness, allowing them to generate hyper-realistic portraits in any setting, style, or outfit imaginable.
 
 Built on a robust, high-performance monorepo architecture, PixGen is designed for scale, speed, and seamless developer experience.
 
@@ -61,7 +61,7 @@ graph TD
 ```
 
 1. **Upload & Zip**: User selects 5-20 photos. The frontend zips them and securely uploads to Object Storage (S3/R2) using a pre-signed URL.
-2. **Training**: The backend triggers a Modal.com Flux LoRA training job using the uploaded zip.
+2. **Training**: The backend triggers a Modal.com SDXL LoRA training job using the uploaded zip.
 3. **Async Webhooks**: Modal notifies the backend via webhooks when training is done or when images are generated, ensuring non-blocking operations.
 4. **Inference**: Users select a trained model (or a generic one) and a "Prompt Pack" style to generate new images.
 
@@ -70,7 +70,7 @@ graph TD
 ## 🧠 Core Features
 
 ### 1. Personalized AI Training
-- **Flux LoRA Integration**: Leverage state-of-the-art Flux models for high-fidelity facial and feature retention.
+- **SDXL LoRA Integration**: Leverage the highly efficient and capable SDXL 1.0 architecture for high-fidelity facial and feature retention on cost-effective GPUs.
 - **Dataset Orchestration**: Automated handling of image uploads, zip creation, and cloud storage syncing.
 - **Asynchronous Processing**: Background training tasks with real-time status updates (Pending, Generated, Failed).
 
