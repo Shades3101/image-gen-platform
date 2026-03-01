@@ -1,4 +1,5 @@
 import TopBar from "@/components/dashboard/TopBar";
+import UserSync from "@/components/dashboard/UserSync";
 
 export default function DashboardLayout({
     children,
@@ -7,6 +8,7 @@ export default function DashboardLayout({
 }) {
     return (
         <div className="flex flex-col min-h-screen bg-background text-foreground overflow-x-hidden">
+            <UserSync />
             <TopBar />
             <main className="flex-1 overflow-y-auto relative w-full">
                 {children}

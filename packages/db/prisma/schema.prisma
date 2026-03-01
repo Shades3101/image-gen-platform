@@ -14,43 +14,52 @@ datasource db {
 }
 
 model User {
-  id             String   @id @default(uuid())
-  username       String   @unique
+  id             String         @id @default(uuid())
+  username       String         @unique
   profilePicture String?
-  createdAt      DateTime @default(now())
-  updateAt       DateTime @updatedAt
+  createdAt      DateTime       @default(now())
+  updateAt       DateTime       @updatedAt
+  models         Model[]
+  outputImages   OutputImages[]
 }
 
 model Model {
   id             String          @id @default(uuid())
   name           String
-  type           ModelTypeEnum
   age            Int
-  ethnicity      EthnicityEnum
-  eyeColor       EyeColorEnum
   bald           Boolean
   userId         String
   triggerWord    String?
   tensorPath     String?
   thumbnail      String?
-  trainingStatus ModelStatusEnum @default(Pending)
-  outputImages   OutputImages[]
   createdAt      DateTime        @default(now())
   updateAt       DateTime        @updatedAt
   zipUrl         String
   open           Boolean         @default(false)
+  type           ModelTypeEnum
+  ethnicity      EthnicityEnum
+  eyeColor       EyeColorEnum
+  trainingStatus ModelStatusEnum @default(Pending)
+  outputImages   OutputImages[]
+  user           User            @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+
 }
 
 model OutputImages {
-  id           String                @id @default(uuid())
-  imageUrl     String                @default("")
-  modelId      String
-  userId       String
-  prompt       String
-  status       OutputImageStatusEnum @default(Pending)
-  model        Model                 @relation(fields: [modelId], references: [id])
-  createdAt    DateTime              @default(now())
-  updateAt     DateTime              @updatedAt
+  id        String                @id @default(uuid())
+  imageUrl  String                @default("")
+  modelId   String
+  userId    String
+  prompt    String
+  createdAt DateTime              @default(now())
+  updateAt  DateTime              @updatedAt
+  status    OutputImageStatusEnum @default(Pending)
+  user      User                  @relation(fields: [userId], references: [id])
+  model     Model                 @relation(fields: [modelId], references: [id])
+
+  @@index([userId, modelId])
 }
 
 model Packs {
@@ -67,6 +76,8 @@ model PackPrompts {
   prompt String
   packId String
   pack   Packs  @relation(fields: [packId], references: [id])
+
+  @@index([packId])
 }
 
 enum ModelStatusEnum {

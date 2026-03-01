@@ -5,33 +5,40 @@ This file tracks identified issues, bugs, and areas for improvement in the PixGe
 ## 🛠 Backend Issues
 
 ### Project Structure & Configuration
-- [ ] **Single-File Backend**: All 9 API routes are defined in a single 312-line `index.ts` file. As the app grows, this becomes unmaintainable.
-  - *Impact*: Poor code organization, difficult to navigate and test individual routes
-  - *Effort*: Medium (extract route handlers into separate modules like `routes/ai.ts`, `routes/packs.ts`, `routes/webhooks.ts`)
-- [ ] **`@types/*` in Production Dependencies**: `@types/cors`, `@types/express`, and `@types/jsonwebtoken` are listed under `dependencies` instead of `devDependencies` in `apps/backend/package.json`.
-  - *Impact*: Bloats production bundle unnecessarily
-  - *Effort*: Trivial (move to `devDependencies`)
-- [ ] **Console.log in Production Code**: Debug `console.log` statements left in pre-signed URL generation (line 37) and training request (lines 70–71) of `index.ts`.
-  - *Impact*: Leaks internal URLs and keys to stdout in production
-  - *Effort*: Trivial (replace with structured logging or remove)
-- [ ] **Stale `.env.example`**: `apps/backend/.env.example` still references `FAL_KEY` (removed dependency) and is missing `MODAL_BASE_URL`, `MODAL_DEV`, `MODAL_WEBHOOK_SECRET`, and `FRONTEND_URL`.
-  - *Impact*: New contributors cannot set up the backend without guessing required variables
-  - *Effort*: Trivial (update file to reflect actual env vars)
-- [ ] **Missing Frontend `.env.example`**: `apps/web/.env` contains real keys but no `.env.example` template exists for contributors.
-  - *Impact*: Onboarding friction; risk of accidentally committing real keys
-  - *Effort*: Trivial (create `.env.example` with placeholder values)
+- [x] **Single-File Backend**: All 9 API routes are defined in a single 312-line `index.ts` file. Refactored into modular controllers and routers (`apps/backend/routes/`, `apps/backend/controllers/`).
+  - *Impact*: Greatly improved maintainability and readability.
+  - *Effort*: Done.
+  
+- [x] **🔴 Model Name Sent as Trigger Word**: In `/ai/training`, `parsedBody.data.name` (the model name) is passed as `triggerWord` to `modalModel.trainModel()`. The trigger word should be a unique identifier like `sks` — not the human-readable model name. Implemented `generateTriggerWord` utility to auto-generate unique SKids (e.g., `sks_abc123`) from the model name.
+  - *Impact*: Training now uses reliable, unique trigger words.
+  - *Effort*: Done.
+
+- [x] **`@types/*` in Production Dependencies**: Moved `@types/cors`, `@types/express`, and `@types/jsonwebtoken` to `devDependencies` in `apps/backend/package.json`.
+  - *Impact*: Smaller production installation.
+  - *Effort*: Done.
+
+- [x] **Console.log in Production Code**: Debug `console.log` statements left in pre-signed URL generation (line 37) and training request (lines 70–71) of `index.ts`. Sanitized logs in `aiController.ts` and `uploadRouter.ts` to strip sensitive information like `MODAL_BASE_URL` and raw error objects.
+  - *Impact*: Protected internal URLs and credentials from stdout exposure.
+  - *Effort*: Done.
+
+- [x] **Stale `.env.example`**: `apps/backend/.env.example` still references `FAL_KEY` (removed dependency) and is missing `MODAL_BASE_URL`, `MODAL_DEV`, `MODAL_WEBHOOK_SECRET`, and `FRONTEND_URL`. Synced `.env.example` files across backend, web, and db packages to match current `.env` requirements.
+  - *Impact*: New contributors can easily set up the project without guessing required variables.
+  - *Effort*: Done.
+
+- [x] **Missing Frontend `.env.example`**: Created `.env.example` in `apps/web/` with necessary Clerk and cloudflare R2 placeholders.
+  - *Impact*: Documented environment requirements for frontend contributors.
+  - *Effort*: Done.
+
 - [x] **Next.js Build Compatibility**: Wrapped `useSearchParams` dependent logic in `DashboardContent` with `<Suspense />` boundaries.
+
 - [x] **Git Hygiene**: Improved `.gitignore` patterns to accurately filter Bun and Next.js temporary files.
-- [ ] **Clerk Middleware File Naming**: Clerk middleware is still in `proxy.ts` instead of the Next.js-standard `middleware.ts`.
-  - *Impact*: Next.js may not auto-detect the middleware; confusing for contributors
-  - *Effort*: Trivial (rename `proxy.ts` → `middleware.ts`)
 
 ### Security
 
 #### 🔴 CRITICAL Priority
-- [ ] **Unauthenticated Pre-Signed URL Endpoint**: `GET /pre-signed-url` has **no `authMiddleware`** — anyone can generate S3/R2 upload URLs without authentication.
-  - *Impact*: Attackers can upload arbitrary files to your Cloudflare R2 bucket, leading to storage abuse and potential malicious content hosting
-  - *Effort*: Trivial (add `authMiddleware` to the route)
+- [x] **Unauthenticated Pre-Signed URL Endpoint**: `GET /pre-signed-url` has **no `authMiddleware`** — anyone can generate S3/R2 upload URLs without authentication. Added `authMiddleware` to the route in `uploadRouter.ts`.
+  - *Impact*: Only authenticated users can generate upload URLs, preventing storage abuse.
+  - *Effort*: Done.
 
 - [ ] **No Rate Limiting**: All API endpoints have zero request throttling. No `express-rate-limit` or equivalent is configured.
   - *Impact*: Vulnerable to brute-force attacks, DoS, and abuse of GPU training endpoints (each training run costs real money on Modal)
@@ -46,13 +53,13 @@ This file tracks identified issues, bugs, and areas for improvement in the PixGe
   - *Impact*: Database overload from excessively large queries; potential data exfiltration
   - *Effort*: Low (add server-side max limits, validate numeric inputs)
 
-- [ ] **Missing Error Handling in `/ai/generate`**: Unlike `/ai/training` which has try-catch, the `/ai/generate` endpoint has no error handling — a Modal API failure will crash the request with an unhandled promise rejection.
-  - *Impact*: Unhandled errors cause 500 responses with stack traces leaked to the client
-  - *Effort*: Low (wrap in try-catch like the training endpoint)
+- [x] **Missing Error Handling in `/ai/generate`**: Added background `try-catch` block around the Modal generation request to prevent unhandled promise rejections.
+  - *Impact*: Server remains stable even if Modal API calls fail.
+  - *Effort*: Done.
 
-- [ ] **Missing Error Handling in `/pack/generate`**: Same issue as `/ai/generate` — no try-catch around the Modal API calls or bulk database operations.
-  - *Impact*: A single failed image generation in a pack breaks the entire batch with no graceful error
-  - *Effort*: Low (add try-catch, consider partial failure handling)
+- [x] **Missing Error Handling in `/pack/generate`**: Wrapped bulk Modal generation calls in `Promise.all` within a `try-catch` block for resilient batch processing.
+  - *Impact*: Batch failures no longer crash the request; errors are logged correctly.
+  - *Effort*: Done.
 
 - [ ] **Account Enumeration via Error Messages**: API returns specific error messages like `"Model not found"` and `"Input incorrect"` which could help attackers map valid resources.
   - *Impact*: Information leakage about system internals
@@ -80,21 +87,19 @@ This file tracks identified issues, bugs, and areas for improvement in the PixGe
 ## 🗄 Database Issues
 
 ### Schema Design
-- [ ] **`User` Model is Unused**: The `User` table exists in the Prisma schema but no API endpoint creates, reads, or references it. Authentication is handled entirely by Clerk.
-  - *Impact*: Dead schema cruft; confusing for contributors
-  - *Effort*: Trivial (remove the model or integrate it for user profile data)
+- [x] **🔴 User Not Saved to DB**: The `User` table exists in the Prisma schema but no API endpoint creates or syncs users from Clerk. Fixed via `UserSync` component (mounted in dashboard layout) which calls `POST /user-auth` on every session to upsert the user into the DB. Username fallback uses `user.id` (Clerk ID) to avoid unique constraint collisions. P2002 errors are handled gracefully.
 
-- [ ] **No Foreign Key on `userId`**: Both `Model.userId` and `OutputImages.userId` are plain strings with no `@relation` to the `User` model. There is zero referential integrity.
-  - *Impact*: Orphaned records, no cascade deletes, impossible to join user data
-  - *Effort*: Medium (add relations and run migration — breaking if `userId` values don't match `User.id`)
+- [x] **No Foreign Key on `userId`**: Updated `schema.prisma` to include `@relation` fields for `userId` in `Model` and `OutputImages` models.
+  - *Impact*: Referential integrity established; cascade deletes now possible.
+  - *Effort*: Done.
 
 - [ ] **Field Naming Typo**: `updateAt` is used instead of the standard `updatedAt` in `User`, `Model`, and `OutputImages` models.
   - *Impact*: Inconsistency with Prisma conventions and community expectations
   - *Effort*: Low (rename via migration — non-breaking at app level since Prisma maps it)
 
-- [ ] **No Indexes on Frequently Queried Fields**: No explicit indexes on `Model.userId`, `OutputImages.userId`, `OutputImages.modelId`, or `OutputImages.status`.
-  - *Impact*: Slow query performance as data grows, especially for the image bulk endpoint which filters by userId + status
-  - *Effort*: Low (add `@@index` declarations in schema)
+- [x] **No Indexes on Frequently Queried Fields**: No explicit indexes on `Model.userId`, `OutputImages.userId`, `OutputImages.modelId`, or `OutputImages.status`. Added `@@index` on `Model(userId)`, `OutputImages(userId, modelId)`, and `PackPrompts(packId)`.
+  - *Impact*: significantly improved query performance for user-specific models and images.
+  - *Effort*: Done.
 
 - [ ] **Inconsistent ID Strategy**: All models use UUID strings which is consistent — but no indexes are optimized for UUID lookups at scale.
   - *Impact*: UUID primary keys are slower than sequential IDs for B-tree indexes
@@ -127,6 +132,18 @@ This file tracks identified issues, bugs, and areas for improvement in the PixGe
   - *Effort*: Trivial (add a styled `not-found.tsx`)
 
 ### UI/UX Issues
+- [ ] **🔴 Upload Icon Still Shows After Image Upload**: In the training flow, after the user uploads images, the upload icon/placeholder remains visible instead of showing a success state or the uploaded file count.
+  - *Impact*: User confusion — no visual feedback that upload succeeded
+  - *Effort*: Low (toggle upload icon visibility based on uploaded file state)
+
+- [ ] **🔴 Remove Dead "Preview Area" in GenerateTab**: The `GenerateTab` component has a large preview area that shows "Generation Triggered!" text but never displays the actual generated image (images only appear in the Camera/gallery tab).
+  - *Impact*: Misleading UI — users expect to see their image but only get a text message
+  - *Effort*: Low (remove the preview area entirely, or replace with a redirect/link to the gallery tab)
+
+- [ ] **🔴 Dashboard Tabs Should Be Server Components**: All dashboard tabs (`GenerateTab`, `TrainTab`, `CameraTab`, `PacksTab`) are client components. Converting them to server components with targeted client islands would improve initial load performance.
+  - *Impact*: Entire dashboard is client-rendered; no SSR benefits, slower initial paint, larger JS bundle
+  - *Effort*: Medium (refactor tabs to server components, extract interactive parts into small `"use client"` islands, use Next.js parallel routes or server-driven tab switching)
+
 - [ ] **No Responsive Image Optimization**: Images in `public/` (gallery-1/2/3.png, hero-image.png) are served as raw PNGs with no Next.js `<Image>` optimization.
   - *Impact*: Slow page loads on mobile (600KB+ of unoptimized images)
   - *Effort*: Low (use `next/image` with width/height props)
@@ -151,6 +168,7 @@ This file tracks identified issues, bugs, and areas for improvement in the PixGe
   - *Effort*: Low (accept optional overrides in the training payload)
 
 - [x] **Fal.ai Integration Purge**: All 10 redundant components and Fal.ai logic (`FalAIModel.ts`) have been removed in favor of Modal.
+
 - [ ] **No GPU Fallback**: The service targets L4 GPUs specifically. If L4 capacity is unavailable on Modal, jobs will queue indefinitely.
   - *Impact*: Training jobs blocked during GPU shortages
   - *Effort*: Low (add fallback GPU tiers in Modal config)
@@ -162,8 +180,10 @@ This file tracks identified issues, bugs, and areas for improvement in the PixGe
 ### Backend Bottlenecks
 - [ ] **Synchronous Webhook Processing**: Webhook handlers (`/modal/webhook/train`, `/modal/webhook/image`) perform database updates synchronously. Under high load, webhook processing could back up.
   - *Solution*: Queue webhook payloads and process asynchronously
+
 - [ ] **No Connection Pooling Configuration**: The Prisma client uses `@prisma/adapter-pg` with a raw connection string. No explicit pool size or timeout configuration.
   - *Solution*: Configure `PrismaPg` with pool settings appropriate for expected load
+
 - [ ] **No Caching Layer**: Every `/models` and `/pack/bulk` request hits the database directly. These rarely-changing datasets are prime caching candidates.
   - *Solution*: Add Redis or in-memory caching with TTL for static-ish data
 
@@ -171,9 +191,11 @@ This file tracks identified issues, bugs, and areas for improvement in the PixGe
 - [ ] **No CI/CD Pipeline**: No GitHub Actions, Vercel config, or deployment scripts of any kind.
   - *Impact*: Manual deployments; no automated testing or build verification before merge
   - *Effort*: Medium (set up GitHub Actions for lint, type-check, build)
+
 - [ ] **No Dockerization**: No `Dockerfile` or `docker-compose.yml` for containerized deployments.
   - *Impact*: Environment-specific bugs; difficult to reproduce production issues locally
   - *Effort*: Medium (create multi-stage Docker builds for backend and web)
+
 - [ ] **No Monitoring/Observability**: No error tracking (Sentry), structured logging (Pino), or APM tooling.
   - *Impact*: Production issues are invisible until users report them
   - *Effort*: Medium (integrate Sentry + structured logging)
@@ -182,6 +204,7 @@ This file tracks identified issues, bugs, and areas for improvement in the PixGe
 - [ ] **Zero Test Coverage**: No unit, integration, or E2E tests exist anywhere in the monorepo.
   - *Impact*: Every code change is a potential regression; no confidence in refactors
   - *Effort*: High (establish testing infrastructure with Vitest + Playwright)
+
 - [ ] **No API Documentation**: No OpenAPI/Swagger documentation for the 9 REST endpoints.
   - *Impact*: Frontend developers must read backend source code to understand API contracts
   - *Effort*: Medium (add Swagger via `express-openapi` or manual OpenAPI spec)
@@ -223,29 +246,44 @@ To move beyond the current development state, the following changes are required
 
 ### 1. Security Hardening
 - [ ] **Authenticate all endpoints**: Add `authMiddleware` to `/pre-signed-url` and validate `/pack/bulk` access.
+
 - [ ] **Rate limiting**: Install `express-rate-limit` with per-route limits (training: 5/hr, generation: 30/hr, general: 100/15min).
+
 - [ ] **Startup env validation**: Verify all required environment variables exist before `app.listen()`.
+
 - [ ] **Security headers**: Add `helmet` middleware and configure Next.js security headers.
+
 - [ ] **Input validation hardening**: Add max length/size constraints to all Zod schemas.
 
 ### 2. Reliability & Error Handling
 - [ ] **Global error handlers**: Add Express error middleware and Next.js error boundaries.
+
 - [ ] **Webhook retry logic**: Implement exponential backoff in Modal compute for failed webhook deliveries.
+
 - [ ] **Graceful shutdown**: Handle `SIGTERM`/`SIGINT` to drain connections before exit.
+
 - [ ] **Database indexes**: Add indexes on `userId`, `modelId`, `status`, and `createdAt` fields.
 
 ### 3. Developer Experience
 - [ ] **Route modularization**: Split `index.ts` into separate route modules.
+
 - [ ] **Testing infrastructure**: Set up Vitest for unit tests, Playwright for E2E.
+
 - [ ] **CI/CD pipeline**: GitHub Actions for lint → type-check → test → build → deploy.
+
 - [ ] **API documentation**: Generate OpenAPI spec from route definitions.
+
 - [ ] **Update `.env.example` files**: Ensure all required variables are documented.
 
 ### 4. Scalability
 - [ ] **Redis caching**: Cache model listings, pack data, and user sessions.
+
 - [ ] **Connection pooling**: Configure PgBouncer or Prisma Accelerate for database connections.
+
 - [ ] **CDN for static assets**: Serve gallery images and fonts from a CDN edge.
+
 - [ ] **Image optimization**: Configure Next.js `<Image>` with remote pattern support for R2 URLs.
+
 - [ ] **Background job processing**: Queue expensive operations (training, bulk generation) via BullMQ.
 
 ---
@@ -265,4 +303,24 @@ To move beyond the current development state, the following changes are required
   - Fully migrated from FLUX.1-dev to SDXL 1.0 (saving ~$2/hr per job using T4 GPUs).
   - Resolved `Float/Half` mixed-precision SDXL generation bugs by pinning `peft==0.15.2` and `diffusers==0.31.0`.
   - Configured successful Modal → Render webhook pipeline mapping (addressed HMAC JSON mismatches + added 60-second timeouts).
-- **Still Pending**: Security hardening (Rate limiting, Auth on pre-signed URLs), Console log cleanup, and UI library consolidation remain high-priority tasks for the next sprint.
+- **2026-03-01**: Added 7 new issues from manual review:
+  - **🔴 Trigger Word Bug**: Model name incorrectly used as trigger word in training requests.
+  - **🔴 Excessive DB Hits**: Image generation does create + update (2 hits) instead of single create via webhook.
+  - **🔴 User Not Persisted**: Clerk users are not synced to the DB `User` table, breaking FK relationships.
+  - **🔴 Upload Icon Bug**: Upload placeholder icon persists after successful image upload.
+  - **🔴 Dead Preview Area**: GenerateTab preview field never shows generated images.
+  - **🔴 Model ID Flow**: Image record IDs should be generated and passed through Modal, not created prematurely.
+  - **🔴 Client-Side Tabs**: Dashboard tabs should be server components for faster loading.
+  - **Async Generation**: Made `/ai/generate` and `/pack/generate` fire-and-forget (matching training endpoint).
+  - **ASI Bug Fix**: Fixed missing semicolon that caused Prisma `.create()` result to be called as a function.
+- **Still Pending**: Security hardening (Rate limiting, Auth on pre-signed URLs), Console log cleanup, UI library consolidation, and remaining 🔴 items above.
+- **2026-03-01 (Session 2)**: Fixed user persistence and auth sync bugs:
+  - **UserSync Component**: Added `UserSync` to `dashboard/layout.tsx` — fires `POST /user-auth` on every authenticated dashboard session to upsert the Clerk user into the DB.
+  - **Username Collision Fix**: Changed username fallback from `user.firstName` (non-unique) to `user.id` (Clerk ID, globally unique) in `UserSync.tsx` to prevent P2002 unique constraint violations.
+  - **Graceful P2002 Handling**: Added explicit `error.code === "P2002"` catch in `authController.ts` — username conflicts are treated as a soft success instead of returning 500.
+  - **Build Cache Cleared**: Purged `.next`, `.turbo`, and `node_modules/.cache` for clean rebuild.
+- **2026-03-01 (Session 3)**: Major Backend Refactoring & Schema Hardening:
+  - **Modularized Backend**: Decoupled the monolithic `index.ts` into a dedicated Router/Controller architecture. Created `AiRouter`, `AuthRouter`, `ModalController`, and `uploadRouter`.
+  - **Schema Relations**: Implemented Prisma relations (@relation) for `User` to `Model` and `OutputImages`, ensuring referential integrity across the database.
+  - **Dependency Hygiene**: Moved `@types/` packages to `devDependencies` in `apps/backend`.
+  - **Modal Integration**: Refined `main.py` in `apps/modal-compute` and `ModalModel.ts` in backend for cleaner image extraction logic.

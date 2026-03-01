@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 
 
+## 2026-03-01
+
+### Added
+- **UserSync Component**: Added `UserSync` to `dashboard/layout.tsx` — a headless client component that fires `POST /user-auth` on every authenticated dashboard session to upsert the Clerk user into the DB. Resolves the long-standing audit item of users not being persisted.
+
+### Fixed
+- **Username Unique Constraint Crash (P2002)**: `UserSync` was sending `user.firstName` as a username fallback, causing a `P2002` unique constraint violation when two users shared the same first name. Changed fallback to `user.id` (Clerk ID — globally unique) so upserts always succeed during create.
+- **Graceful P2002 Handling in `authController`**: Added an explicit `error.code === "P2002"` catch block — username conflicts are now treated as a soft success (`200 OK`) rather than returning a `500` error to the client.
+- **Build Cache Cleared**: Purged `.next`, `.turbo`, and `node_modules/.cache` to resolve stale CSS and theme not appearing correctly in local dev.
+- **Database Index Optimization**: Added explicit indexes to `Model`, `OutputImages`, and `PackPrompts` tables to accelerate user-specific queries and pack processing.
+- **Console Log Sanitation**: Stripped sensitive environment variables and raw error objects from production logs in `aiController.ts` and `uploadRouter.ts` to prevent information leakage.
+- **Resilient Pre-Signed URLs**: Added `authMiddleware` to the `/pre-signed-url` endpoint to prevent anonymous uploads to Cloudflare R2.
+- **Unique Trigger Word Generation**: Implemented a utility to auto-generate unique identifiers (e.g., `sks_abc123`) from the model name during training. This ensures LoRA models learn distinct concepts and inference prompts are reliable.
+- **Backend Resilience**: Added background `try-catch` blocks and `Promise.all` optimizations to generation endpoints. Refined `userId` validation across the backend to prevent unauthenticated or malformed requests.
+- **Backend Refactoring (Router/Controller Architecture)**: Modularized the monolithic `index.ts` in `apps/backend`. Extracted logic into `AiRouter.ts`, `AuthRouter.ts`, `webhookRouter.ts`, and `uploadRouter.ts`, with corresponding controllers in `apps/backend/controllers/`. Improved code organization and maintainability.
+- **Prisma Schema Relations**: Added `@relation` fields to `Model` and `OutputImages` in `schema.prisma` to establish strict foreign key relationships with the `User` model, ensuring referential integrity.
+- **Dependency Optimization**: Moved `@types/cors`, `@types/express`, and `@types/jsonwebtoken` to `devDependencies` in `apps/backend`.
+- **Environment Configuration**: Synchronized `.env.example` files across frontend (`apps/web`), backend (`apps/backend`), and database (`packages/db`) to accurately reflect current `.env` requirements and port configurations (e.g., `FRONTEND_URL`, backend port 3001).
+
+---
+
 ## 2026-02-28
 
 ### Added
